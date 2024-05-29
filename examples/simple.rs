@@ -144,7 +144,7 @@ fn setup(
         
                     for x in 0..64 {
                         for y in 0..64 {
-                            if (cy == 1 && y > 32) || rng.gen_bool(0.2) {
+                            if rng.gen_bool(0.5) {
                                 center_chunk.replace(IVec2::new(x, y), SimpleSand::Sand);
                             }
                         }

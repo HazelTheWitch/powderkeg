@@ -1,4 +1,6 @@
-use bevy::math::{IRect, IVec2};
+use bevy::{math::{IRect, IVec2}, utils::hashbrown::HashSet};
+use itertools::Itertools;
+use rand::{seq::SliceRandom, thread_rng};
 
 use crate::grid::Grid;
 
@@ -15,6 +17,33 @@ impl Stain {
             Stain::Empty => true,
             Stain::Area(area) => area.is_empty(),
             Stain::Many(areas) => areas.iter().all(|area| area.is_empty()),
+        }
+    }
+
+    pub fn apply_randomly(&self, mut f: impl FnMut(IVec2)) {
+        let mut choices: Vec<IVec2> = match self {
+            Stain::Empty => return,
+            Stain::Area(area) => {
+                (area.min.y..=area.max.y)
+                    .cartesian_product(area.min.x..=area.max.x)
+                    .map(|(y, x)| IVec2::new(x, y)).collect()
+            },
+            Stain::Many(areas) => {
+                areas
+                    .iter()
+                    .flat_map(|area| 
+                        (area.min.y..=area.max.y)
+                            .cartesian_product(area.min.x..=area.max.x)
+                            .map(|(y, x)| IVec2::new(x, y))
+                    )
+                    .collect()
+            },
+        };
+
+        choices.as_mut_slice().shuffle(&mut thread_rng());
+
+        for point in choices {
+            f(point)
         }
     }
 

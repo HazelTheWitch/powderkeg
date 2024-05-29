@@ -173,7 +173,7 @@ fn simulate_powderkeg<T, const N: i32>(
 
             chunk.clear_stain();
 
-            stain.apply(|point| {
+            stain.apply_randomly(|point| {
                 let cell = chunk.at(point);
 
                 let range = translate_rect(cell.range(), point);
