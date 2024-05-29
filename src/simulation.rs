@@ -164,6 +164,7 @@ fn simulate_powderkeg<T, const N: i32>(
     if *ticks >= 1.0 {
         let (send_to_tick, recieve_to_tick) = unbounded::<IVec2>();
         let (send_errors, recieve_errors) = unbounded::<(IVec2, T::Error)>();
+        let (send_stains, recieve_stains) = unbounded::<IRect>();
 
         chunks.par_iter_mut().for_each(|(coords, mut chunk)| {
             let area = Chunk::<T, N, <T::Action as Action>::State>::area();
@@ -193,10 +194,19 @@ fn simulate_powderkeg<T, const N: i32>(
                     send_to_tick.send(coords.local_to_world(point)).expect("channel unexpectedly closed");
                 }
             });
+
+            if let Some(stain) = chunk.stain.as_ref() {
+                let area = Chunk::<T, N>::area();
+
+                if !(area.contains(stain.min) && area.contains(stain.max)) {
+                    send_stains.send(translate_rect(*stain, N * coords.0)).expect("channel unexpectedly closed");
+                }
+            }
         });
 
         drop(send_to_tick);
         drop(send_errors);
+        drop(send_stains);
 
         for (point, error) in recieve_errors.iter() {
             error!("Error ticking {point}: {error}");
@@ -210,6 +220,10 @@ fn simulate_powderkeg<T, const N: i32>(
         let mut world_grid = WorldGrid {
             chunks,
         };
+
+        for stain in recieve_stains.iter() {
+            world_grid.stain(stain);
+        }
 
         for point in recieve_to_tick.iter() {
             let cell = world_grid.at(point);

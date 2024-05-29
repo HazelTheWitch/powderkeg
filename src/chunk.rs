@@ -7,7 +7,7 @@ use crate::{cell::Renderable, grid::Grid, stain::{Stain, Stainable}};
 #[derive(Component)]
 pub struct Chunk<T, const N: i32, S = ()> {
     data: Vec<T>,
-    stain: Option<IRect>,
+    pub(crate) stain: Option<IRect>,
     state: S,
 }
 
@@ -152,9 +152,7 @@ impl<T, const N: i32, S> Stainable for Chunk<T, N, S> {
         self.stain = None;
     }
 
-    fn stain(&mut self, mut area: IRect) {
-        area = area.intersect(Self::area());
-    
+    fn stain(&mut self, area: IRect) {
         match &mut self.stain {
             Some(stain) => *stain = stain.union(area),
             stain @ None => *stain = Some(area),
@@ -162,11 +160,9 @@ impl<T, const N: i32, S> Stainable for Chunk<T, N, S> {
     }
 
     fn stain_point(&mut self, point: IVec2) {
-        if Self::area().contains(point) {
-            match &mut self.stain {
-                Some(stain) => *stain = stain.union_point(point),
-                stain @ None => *stain = Some(IRect::from_corners(point, point)),
-            }
+        match &mut self.stain {
+            Some(stain) => *stain = stain.union_point(point),
+            stain @ None => *stain = Some(IRect::from_corners(point, point)),
         }
     }
 }
