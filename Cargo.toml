@@ -1,0 +1,15 @@
+[package]
+name = "powderkeg"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+bevy = { version = "0.13.2", default-features = false, features = ["bevy_render", "bevy_asset", "bevy_sprite"] }
+crossbeam-channel = "0.5.13"
+image = { version = "0.24.9", default-features = false }
+itertools = "0.13.0"
+rand = "0.8.5"
+smallvec = "1.13.2"
+
+[dev-dependencies]
+bevy = "0.13.2"
