@@ -4,7 +4,7 @@ use bevy::{diagnostic::{DiagnosticsStore, FrameTimeDiagnosticsPlugin}, prelude::
 use powderkeg::{cell::{Action, Cell, Renderable}, chunk::{Chunk, ChunkBundle, ChunkCoords}, grid::Grid, simulation::PowderkegTickRate, stain::Stainable, viewer::DrawStained, PowderkegPlugin, PowderkegSet};
 use rand::{thread_rng, Rng};
 
-const CHUNK_SIZE: i32 = 128;
+const CHUNK_SIZE: i32 = 64;
 
 #[derive(Clone, Copy, Default)]
 pub enum SimpleSand {
@@ -134,7 +134,7 @@ fn setup(
 
     commands
         .spawn(SpatialBundle {
-            transform: Transform::default().with_scale(Vec3::splat(3.0)),
+            transform: Transform::default().with_scale(Vec3::splat(2.0)),
             ..Default::default()
         })
         .with_children(|children| {
