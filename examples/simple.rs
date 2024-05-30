@@ -9,6 +9,7 @@ const CHUNK_SIZE: i32 = 64;
 #[derive(Clone, Copy, Default)]
 pub enum SimpleSand {
     Sand,
+    Stone,
     #[default]
     Air,
 }
@@ -50,6 +51,7 @@ impl Cell for SimpleSand {
 
                 Ok(None)
             },
+            SimpleSand::Stone => Ok(None),
             SimpleSand::Air => Ok(None),
         }
     }
@@ -63,6 +65,7 @@ impl Renderable for SimpleSand {
     fn to_color(&self, _: IVec2) -> Color {
         match self {
             SimpleSand::Sand => Color::BEIGE,
+            SimpleSand::Stone => Color::GRAY,
             SimpleSand::Air => Color::BLACK,
         }
     }
@@ -197,6 +200,8 @@ fn paint_sand(
         SimpleSand::Sand
     } else if buttons.pressed(MouseButton::Right) {
         SimpleSand::Air
+    } else if buttons.pressed(MouseButton::Middle) {
+        SimpleSand::Stone
     } else {
         return;
     };

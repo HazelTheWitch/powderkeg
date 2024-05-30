@@ -1,7 +1,7 @@
 use std::convert::Infallible;
 
 use bevy::{diagnostic::FrameTimeDiagnosticsPlugin, prelude::*, window::PresentMode};
-use powderkeg::{cell::{Action, Cell, Renderable}, chunk::{Chunk, ChunkBundle, ChunkCoords}, simulation::PowderkegTickRate, viewer::DrawStained, PowderkegPlugin, PowderkegSet};
+use powderkeg::{cell::{Action, Cell, Renderable}, chunk::{Chunk, ChunkBundle, ChunkCoords}, simulation::PowderkegTickRate, viewer::DrawStained, PowderkegPlugin};
 use rand::{distributions::{Distribution, Uniform}, seq::IteratorRandom, thread_rng, Rng};
 
 struct LiquidDistribution {
@@ -76,7 +76,7 @@ impl Cell for MultiLiquidCell {
                     }
                 }
 
-                Ok(Some(LiquidAction::Stable))
+                Ok(None)
             },
         }
     }
