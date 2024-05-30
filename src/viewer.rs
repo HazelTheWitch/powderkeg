@@ -3,7 +3,7 @@ use std::marker::PhantomData;
 use bevy::{asset::load_internal_asset, prelude::*, render::{render_asset::RenderAssetUsages, render_resource::AsBindGroup}, sprite::{Material2d, Material2dPlugin, Mesh2dHandle}};
 use image::{DynamicImage, RgbaImage};
 
-use crate::{cell::{Action, Renderable}, chunk::Chunk, grid::Grid, stain::{Stain, Stainable}, PowderkegSet};
+use crate::{cell::Renderable, chunk::Chunk, grid::Grid, stain::{Stain, Stainable}, PowderkegSet};
 
 #[rustfmt::skip]
 pub const CHUNK_SHADER_HANDLE: Handle<Shader> = Handle::weak_from_u128(33721791328259611974385727409331747184);
@@ -21,10 +21,7 @@ where
 
 impl<T, const N: i32> Plugin for PowderkegViewPlugin<T, N>
 where
-    T: Renderable + Send + Sync + 'static,
-    <T::Action as Action>::State: Send + Sync + 'static,
-    T::Action: Send + Sync + 'static,
-    T::Error: Send + Sync + 'static,
+    T: Renderable,
 {
     fn build(&self, app: &mut App) {
         load_internal_asset!(app, CHUNK_SHADER_HANDLE, "chunk.wgsl", Shader::from_wgsl);
@@ -94,17 +91,14 @@ fn instantiate_chunk_images<T: Renderable + Send + Sync + 'static, const N: i32>
 
 fn generate_chunk_images<T, const N: i32>(
     mut chunks: Query<(
-        &Chunk<T, N, <T::Action as Action>::State>,
+        &Chunk<T, N>,
         &mut Handle<ChunkMaterial>,
         &ViewVisibility
     )>,
     mut images: ResMut<Assets<Image>>,
     mut materials: ResMut<Assets<ChunkMaterial>>,
 ) where
-    T: Renderable + Send + Sync + 'static,
-    <T::Action as Action>::State: Send + Sync + 'static,
-    T::Action: Send + Sync + 'static,
-    T::Error: Send + Sync + 'static,
+    T: Renderable,
 {
     for (chunk, material_handle, visible) in chunks.iter_mut() {
         if !visible.get() {
@@ -144,12 +138,9 @@ pub struct DrawStained;
 
 fn draw_stained<T, const N: i32>(
     mut gizmos: Gizmos,
-    chunks: Query<(&GlobalTransform, &Chunk<T, N, <T::Action as Action>::State>), With<DrawStained>>,
+    chunks: Query<(&GlobalTransform, &Chunk<T, N>), With<DrawStained>>,
 ) where
-    T: Renderable + Send + Sync + 'static,
-    <T::Action as Action>::State: Send + Sync + 'static,
-    T::Action: Send + Sync + 'static,
-    T::Error: Send + Sync + 'static,
+    T: Renderable,
 {
     for (transform, chunk) in chunks.iter() {
         let (s, _, t) = transform.to_scale_rotation_translation();

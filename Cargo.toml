@@ -4,12 +4,14 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-bevy = { version = "0.13.2", default-features = false, features = ["bevy_render", "bevy_asset", "bevy_sprite"] }
+bevy = { version = "0.13.2", default-features = false, features = ["bevy_render", "bevy_asset", "bevy_sprite", "bevy_gizmos"] }
 crossbeam-channel = "0.5.13"
 image = { version = "0.24.9", default-features = false }
 itertools = "0.13.0"
+parking_lot = "0.12.3"
 rand = "0.8.5"
 smallvec = "1.13.2"
+thiserror = "1.0.61"
 
 [dev-dependencies]
 bevy = "0.13.2"

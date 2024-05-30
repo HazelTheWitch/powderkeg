@@ -1,15 +1,16 @@
-use std::iter;
+use std::{iter, sync::Arc};
 
 use bevy::prelude::*;
+use parking_lot::RwLock;
 use rand::{distributions::Distribution, Rng};
 
-use crate::{cell::Renderable, grid::Grid, stain::{Stain, Stainable}};
+use crate::{cell::{Cell, Renderable}, grid::Grid, stain::{Stain, Stainable}};
 
 #[derive(Component)]
-pub struct Chunk<T, const N: i32, S = ()> {
+pub struct Chunk<T: Cell, const N: i32> {
     data: Vec<T>,
     pub(crate) stain: Option<IRect>,
-    state: S,
+    state: Arc<RwLock<T::State>>,
 }
 
 #[derive(Component, Default)]
@@ -34,28 +35,35 @@ impl<const N: i32> ChunkCoords<N> {
 }
 
 #[derive(Bundle)]
-pub struct ChunkBundle<T: Renderable + Send + Sync + 'static, const N: i32, S: Send + Sync + 'static = ()> {
-    pub chunk: Chunk<T, N, S>,
+pub struct ChunkBundle<T, const N: i32>
+where
+    T: Renderable + Send + Sync + 'static,
+    T::State: Send + Sync + 'static,
+{
+    pub chunk: Chunk<T, N>,
     pub coords: ChunkCoords<N>,
     pub transform: TransformBundle,
     pub visibility: VisibilityBundle,
 }
 
-impl<T, const N: i32, S> Default for ChunkBundle<T, N, S>
+impl<T, const N: i32> Default for ChunkBundle<T, N>
 where
     T: Renderable + Default + Send + Sync + 'static,
-    S: Default + Send + Sync + 'static,
+    T::State: Default + Send + Sync + 'static,
 {
     fn default() -> Self {
         Self { chunk: Default::default(), coords: Default::default(), transform: Default::default(), visibility: Default::default() }
     }
 }
 
-impl<T, const N: i32, S> Chunk<T, N, S> {
-    pub fn new(data: Vec<T>, state: S) -> Self {
+impl<T, const N: i32> Chunk<T, N>
+where
+    T: Cell,
+{
+    pub fn new(data: Vec<T>, state: T::State) -> Self {
         assert_eq!(data.len(), N as usize * N as usize);
 
-        Self { data, stain: Some(Self::area()), state }
+        Self { data, stain: Some(Self::area()), state: Arc::new(RwLock::new(state)) }
     }
 
     pub const fn area() -> IRect {
@@ -75,34 +83,39 @@ impl<T, const N: i32, S> Chunk<T, N, S> {
     }
 }
 
-impl<T, const N: i32, S> Chunk<T, N, S> 
+impl<T, const N: i32> Chunk<T, N> 
 where
-    T: Copy,
+    T: Cell + Copy,
 {
-    pub fn full_copied(value: T, state: S) -> Self {
+    pub fn full_copied(value: T, state: T::State) -> Self {
         Self::new(vec![value; Self::volume()], state)
     }
 }
 
-impl<T, const N: i32, S> Chunk<T, N, S> {
-    pub fn full_random<R: Rng, D: Distribution<T>>(rng: &mut R, distribution: D, state: S) -> Self {
+impl<T, const N: i32> Chunk<T, N>
+where
+    T: Cell,
+{
+    pub fn full_random<R: Rng, D: Distribution<T>>(rng: &mut R, distribution: D, state: T::State) -> Self {
         Self::new(rng.sample_iter(distribution).take(Self::volume()).collect(), state)
     }
 }
 
-impl<T, const N: i32, S> Default for Chunk<T, N, S> 
+impl<T, const N: i32> Default for Chunk<T, N> 
 where
-    T: Default,
-    S: Default,
+    T: Cell + Default,
+    T::State: Default,
 {
     fn default() -> Self {
-        Self::new(iter::repeat_with(|| T::default()).take(Self::volume()).collect(), S::default())
+        Self::new(iter::repeat_with(|| T::default()).take(Self::volume()).collect(), T::State::default())
     }
 }
 
-impl<T, const N: i32, S> Grid for Chunk<T, N, S> {
+impl<T, const N: i32> Grid for Chunk<T, N>
+where
+    T: Cell,
+{
     type Cell = T;
-    type State = S;
 
     fn get(&self, point: IVec2) -> Option<&Self::Cell> {
         let index = self.index(point)?;
@@ -130,24 +143,19 @@ impl<T, const N: i32, S> Grid for Chunk<T, N, S> {
         Some(())
     }
     
-    fn get_state(&self, point: IVec2) -> Option<&Self::State> {
+    fn get_state(&self, point: IVec2) -> Option<Arc<RwLock<<T as Cell>::State>>> {
         if Self::area().contains(point) {
-            Some(&self.state)
-        } else {
-            None
-        }
-    }
-    
-    fn get_state_mut(&mut self, point: IVec2) -> Option<&mut Self::State> {
-        if Self::area().contains(point) {
-            Some(&mut self.state)
+            Some(self.state.clone())
         } else {
             None
         }
     }
 }
 
-impl<T, const N: i32, S> Stainable for Chunk<T, N, S> {
+impl<T, const N: i32> Stainable for Chunk<T, N> 
+where
+    T: Cell,
+{
     fn stained(&self) -> Stain {
         match self.stain {
             Some(area) => area.intersect(Self::area()).into(),

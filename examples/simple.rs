@@ -2,7 +2,7 @@ use std::convert::Infallible;
 
 use bevy::{diagnostic::{DiagnosticsStore, FrameTimeDiagnosticsPlugin}, prelude::*, window::{PresentMode, PrimaryWindow}};
 use powderkeg::{cell::{Action, Cell, Renderable}, chunk::{Chunk, ChunkBundle, ChunkCoords}, grid::Grid, simulation::PowderkegTickRate, stain::Stainable, viewer::DrawStained, PowderkegPlugin, PowderkegSet};
-use rand::{thread_rng, Rng};
+use rand::{rngs::ThreadRng, thread_rng, Rng};
 
 const CHUNK_SIZE: i32 = 64;
 
@@ -15,7 +15,6 @@ pub enum SimpleSand {
 }
 
 impl Cell for SimpleSand {
-    type Action = SimpleAction;
     type Error = Infallible;
 
     fn tick(&self, origin: IVec2, grid: &impl Grid<Cell = Self>) -> Result<Option<Self::Action>, Self::Error> {

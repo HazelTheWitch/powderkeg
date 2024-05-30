@@ -8,15 +8,24 @@ pub mod viewer;
 use std::marker::PhantomData;
 
 use bevy::prelude::*;
-use cell::{Action, Renderable};
+use cell::{Cell, Renderable};
 use simulation::PowderkegSimulationPlugin;
+use thiserror::Error;
 use viewer::PowderkegViewPlugin;
+
+#[derive(Debug, Error)]
+pub enum PowderkegError<T: Cell> {
+    #[error(transparent)]
+    Cell(T::Error),
+    #[error("{0} out of bounds")]
+    OutOfBounds(IVec2),
+}
 
 pub struct PowderkegPlugin<T, const N: i32>(PhantomData<T>);
 
 impl<T, const N: i32> Default for PowderkegPlugin<T, N>
 where
-    T: Renderable + Send + Sync + 'static,
+    T: Renderable,
 {
     fn default() -> Self {
         Self(PhantomData)
@@ -25,10 +34,7 @@ where
 
 impl<T, const N: i32> Plugin for PowderkegPlugin<T, N>
 where
-    T: Renderable + Send + Sync + 'static,
-    <T::Action as Action>::State: Send + Sync + 'static,
-    T::Action: Send + Sync + 'static,
-    T::Error: Send + Sync + 'static,
+    T: Renderable,
 {
     fn build(&self, app: &mut App) {
         app
