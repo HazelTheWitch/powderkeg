@@ -1,6 +1,7 @@
 use std::iter;
 
 use bevy::prelude::*;
+use rand::{distributions::Distribution, Rng};
 
 use crate::{cell::Renderable, grid::Grid, stain::{Stain, Stainable}};
 
@@ -80,6 +81,12 @@ where
 {
     pub fn full_copied(value: T, state: S) -> Self {
         Self::new(vec![value; Self::volume()], state)
+    }
+}
+
+impl<T, const N: i32, S> Chunk<T, N, S> {
+    pub fn full_random<R: Rng, D: Distribution<T>>(rng: &mut R, distribution: D, state: S) -> Self {
+        Self::new(rng.sample_iter(distribution).take(Self::volume()).collect(), state)
     }
 }
 

@@ -4,6 +4,8 @@ use bevy::{diagnostic::{DiagnosticsStore, FrameTimeDiagnosticsPlugin}, prelude::
 use powderkeg::{cell::{Action, Cell, Renderable}, chunk::{Chunk, ChunkBundle, ChunkCoords}, grid::Grid, simulation::PowderkegTickRate, stain::Stainable, viewer::DrawStained, PowderkegPlugin, PowderkegSet};
 use rand::{thread_rng, Rng};
 
+const CHUNK_SIZE: i32 = 128;
+
 #[derive(Clone, Copy, Default)]
 pub enum SimpleSand {
     Sand,
@@ -28,7 +30,7 @@ impl Cell for SimpleSand {
                     }
                 }
 
-                let directions = if rng.gen_bool(0.8) {
+                let directions = if rng.gen_bool(0.5) {
                     &[
                         (Direction::Left, IVec2::new(-1, -1)),
                         (Direction::Right, IVec2::new(1, -1)),
@@ -87,10 +89,10 @@ impl Action for SimpleAction {
             SimpleAction::Fall(direction) => {
                 grid.stain_around(origin, 2);
                 match direction {
-                        Direction::Down => grid.swap(origin, origin + IVec2::new(0, -1))?,
-                        Direction::Left => grid.swap(origin, origin + IVec2::new(-1, -1))?,
-                        Direction::Right => grid.swap(origin, origin + IVec2::new(1, -1))?,
-                    }
+                    Direction::Down => grid.swap(origin, origin + IVec2::new(0, -1))?,
+                    Direction::Left => grid.swap(origin, origin + IVec2::new(-1, -1))?,
+                    Direction::Right => grid.swap(origin, origin + IVec2::new(1, -1))?,
+                }
             },
             SimpleAction::Stable => {
                 grid.stain_around(origin, 1);
@@ -115,7 +117,7 @@ fn main() {
                     ..default()
                 })
         )
-        .add_plugins(PowderkegPlugin::<SimpleSand, 64>::default())
+        .add_plugins(PowderkegPlugin::<SimpleSand, CHUNK_SIZE>::default())
         .add_plugins(FrameTimeDiagnosticsPlugin)
         .add_systems(Startup, setup)
         .add_systems(Update, update_title)
@@ -132,18 +134,18 @@ fn setup(
 
     commands
         .spawn(SpatialBundle {
-            transform: Transform::default().with_scale(Vec3::splat(2.0)),
+            transform: Transform::default().with_scale(Vec3::splat(3.0)),
             ..Default::default()
         })
         .with_children(|children| {
-            for cx in -4..=4 {
-                for cy in -2..2 {
+            for cx in -3..=3 {
+                for cy in -3..=3 {
                     let mut center_chunk = Chunk::default();
 
                     let mut rng = thread_rng();
         
-                    for x in 0..64 {
-                        for y in 0..64 {
+                    for x in 0..CHUNK_SIZE {
+                        for y in 0..CHUNK_SIZE {
                             if rng.gen_bool(0.5) {
                                 center_chunk.replace(IVec2::new(x, y), SimpleSand::Sand);
                             }
@@ -153,10 +155,10 @@ fn setup(
                     let chunk_coords = IVec2::new(cx, cy);
         
                     children.spawn((
-                        ChunkBundle::<SimpleSand, 64> {
+                        ChunkBundle::<SimpleSand, CHUNK_SIZE> {
                             chunk: center_chunk,
                             coords: ChunkCoords(chunk_coords),
-                            transform: TransformBundle::from_transform(Transform::from_translation(chunk_coords.as_vec2().extend(0.0) * 64.0)),
+                            transform: TransformBundle::from_transform(Transform::from_translation(chunk_coords.as_vec2().extend(0.0) * CHUNK_SIZE as f32)),
                             ..default()
                         },
                         DrawStained,
@@ -183,7 +185,7 @@ fn paint_sand(
     buttons: Res<ButtonInput<MouseButton>>,
     windows: Query<&Window, With<PrimaryWindow>>,
     cameras: Query<(&Camera, &GlobalTransform)>,
-    mut chunks: Query<(&mut Chunk<SimpleSand, 64>, &GlobalTransform)>,
+    mut chunks: Query<(&mut Chunk<SimpleSand, CHUNK_SIZE>, &GlobalTransform)>,
 ) {
     let (camera, camera_transform) = cameras.single();
 
@@ -200,11 +202,11 @@ fn paint_sand(
     };
 
     for (mut chunk, transform) in chunks.iter_mut() {
-        let local = transform.affine().inverse().transform_point3(position.extend(0.0)).truncate().as_ivec2() + IVec2::splat(32);
+        let local = transform.affine().inverse().transform_point3(position.extend(0.0)).truncate().as_ivec2() + IVec2::splat(CHUNK_SIZE / 2);
 
         let local_rect = IRect::from_corners(local - 3, local + 3);
 
-        if !Chunk::<SimpleSand, 64>::area().intersect(local_rect).is_empty() {
+        if !Chunk::<SimpleSand, CHUNK_SIZE>::area().intersect(local_rect).is_empty() {
             for x in (local.x - 3)..=(local.x + 3) {
                 for y in (local.y - 3)..=(local.y + 3) {
                     chunk.map_mut(IVec2::new(x, y), |old| *old = cell);
