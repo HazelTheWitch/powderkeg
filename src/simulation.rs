@@ -50,40 +50,45 @@ where
 {
     type Cell = T;
 
-    fn get(&self, point: IVec2) -> Option<&Self::Cell> {
+    fn get(&self, point: IVec2) -> Result<&Self::Cell, PowderkegError<T>> {
         let (chunk, local) = ChunkCoords::<N>::world_to_chunk_and_local(point);
 
-        self.chunks.get(&chunk)?.get(local)
+        self.chunks.get(&chunk).ok_or(PowderkegError::ChunkOutOfBounds(chunk))?.get(local)
     }
 
-    fn get_mut(&mut self, point: IVec2) ->Option<&mut Self::Cell> {
+    fn get_mut(&mut self, point: IVec2) -> Result<&mut Self::Cell, PowderkegError<T>> {
         let (chunk, local) = ChunkCoords::<N>::world_to_chunk_and_local(point);
 
-        self.chunks.get_mut(&chunk)?.get_mut(local)
+        self.chunks.get_mut(&chunk).ok_or(PowderkegError::ChunkOutOfBounds(chunk))?.get_mut(local)
     }
 
-    fn swap(&mut self, first: IVec2, second: IVec2) -> Option<()> {
+    fn swap(&mut self, first: IVec2, second: IVec2) -> Result<(), PowderkegError<T>> {
         let (first_chunk, first_local) = ChunkCoords::<N>::world_to_chunk_and_local(first);
         let (second_chunk, second_local) = ChunkCoords::<N>::world_to_chunk_and_local(second);
 
         if first_chunk == second_chunk {
-            self.chunks.get_mut(&first_chunk)?.swap(first_local, second_local)
-        } else {
-            let [first_chunk, second_chunk] = self.chunks.get_many_mut([&first_chunk, &second_chunk])?;
+            self.chunks.get_mut(&first_chunk).ok_or(PowderkegError::ChunkOutOfBounds(first_chunk))?.swap(first_local, second_local)
+        } else {        
+            let [first_chunk, second_chunk] = self.chunks
+                .get_many_mut([&first_chunk, &second_chunk])
+                .ok_or_else(|| PowderkegError::SwapOutOfBounds { first: first_chunk, second: second_chunk })?;
 
             let first_cell = first_chunk.get_mut(first_local)?;
             let second_cell = second_chunk.get_mut(second_local)?;
 
             swap(first_cell, second_cell);
 
-            Some(())
+            Ok(())
         }
     }
 
-    fn get_state(&self, point: IVec2) -> Option<Arc<RwLock<<T as Cell>::State>>> {
+    fn get_state(&self, point: IVec2) -> Result<Arc<RwLock<<T as Cell>::State>>, PowderkegError<T>> {
         let (chunk, local) = ChunkCoords::<N>::world_to_chunk_and_local(point);
 
-        self.chunks.get(&chunk)?.get_state(local)
+        self.chunks
+            .get(&chunk)
+            .ok_or(PowderkegError::ChunkOutOfBounds(chunk))?
+            .get_state(local)
     }
 }
 

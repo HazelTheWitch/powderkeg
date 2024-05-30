@@ -4,7 +4,7 @@ use bevy::prelude::*;
 use parking_lot::RwLock;
 use rand::{distributions::Distribution, Rng};
 
-use crate::{cell::{Cell, Renderable}, grid::Grid, stain::{Stain, Stainable}};
+use crate::{cell::{Cell, Renderable}, grid::Grid, stain::{Stain, Stainable}, PowderkegError};
 
 #[derive(Component)]
 pub struct Chunk<T: Cell, const N: i32> {
@@ -117,37 +117,37 @@ where
 {
     type Cell = T;
 
-    fn get(&self, point: IVec2) -> Option<&Self::Cell> {
-        let index = self.index(point)?;
+    fn get(&self, point: IVec2) -> Result<&Self::Cell, PowderkegError<Self::Cell>> {
+        let index = self.index(point).ok_or(PowderkegError::LocalOutOfBounds(point))?;
 
-        self.data.get(index)
+        Ok(self.data.get(index).expect("chunk does not have enough cells"))
     }
 
-    fn get_mut(&mut self, point: IVec2) ->Option<&mut Self::Cell> {
-        let index = self.index(point)?;
+    fn get_mut(&mut self, point: IVec2) -> Result<&mut Self::Cell, PowderkegError<Self::Cell>> {
+        let index = self.index(point).ok_or(PowderkegError::LocalOutOfBounds(point))?;
         
         self.stain_point(point);
 
-        self.data.get_mut(index)
+        Ok(self.data.get_mut(index).expect("chunk does not have enough cells"))
     }
 
-    fn swap(&mut self, first: IVec2, second: IVec2) -> Option<()> {
-        let first_index = self.index(first)?;
-        let second_index = self.index(second)?;
+    fn swap(&mut self, first: IVec2, second: IVec2) -> Result<(), PowderkegError<Self::Cell>> {
+        let first_index = self.index(first).ok_or(PowderkegError::LocalOutOfBounds(first))?;
+        let second_index = self.index(second).ok_or(PowderkegError::LocalOutOfBounds(second))?;
 
         self.stain_point(first);
         self.stain_point(second);
 
         self.data.swap(first_index, second_index);
 
-        Some(())
+        Ok(())
     }
     
-    fn get_state(&self, point: IVec2) -> Option<Arc<RwLock<<T as Cell>::State>>> {
+    fn get_state(&self, point: IVec2) -> Result<Arc<RwLock<<T as Cell>::State>>, PowderkegError<Self::Cell>> {
         if Self::area().contains(point) {
-            Some(self.state.clone())
+            Ok(self.state.clone())
         } else {
-            None
+            Err(PowderkegError::LocalOutOfBounds(point))
         }
     }
 }

@@ -17,8 +17,15 @@ use viewer::PowderkegViewPlugin;
 pub enum PowderkegError<T: Cell> {
     #[error(transparent)]
     Cell(T::Error),
-    #[error("{0} out of bounds")]
-    OutOfBounds(IVec2),
+    #[error("chunk local {0} out of bounds")]
+    LocalOutOfBounds(IVec2),
+    #[error("chunk at {0} out of bounds")]
+    ChunkOutOfBounds(IVec2),
+    #[error("chunks not found when swapping {first} -> {second}")]
+    SwapOutOfBounds {
+        first: IVec2,
+        second: IVec2,
+    },
 }
 
 pub struct PowderkegPlugin<T, const N: i32>(PhantomData<T>);
