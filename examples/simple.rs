@@ -1,8 +1,8 @@
 use std::convert::Infallible;
 
-use bevy::{diagnostic::{DiagnosticsStore, FrameTimeDiagnosticsPlugin}, prelude::*, window::{PresentMode, PrimaryWindow}};
-use powderkeg::{cell::{Action, Cell, Renderable}, chunk::{Chunk, ChunkBundle, ChunkCoords}, grid::Grid, simulation::PowderkegTickRate, stain::Stainable, viewer::DrawStained, PowderkegPlugin, PowderkegSet};
-use rand::{rngs::ThreadRng, thread_rng, Rng};
+use bevy::{prelude::*, diagnostic::{DiagnosticsStore, FrameTimeDiagnosticsPlugin}, math::IVec2, render::color::Color, window::{PresentMode, PrimaryWindow}};
+use powderkeg::{cell::{Cell, Renderable, TickInput, TickSuccess}, chunk::{Chunk, ChunkBundle, ChunkCoords}, grid::Grid, simulation::PowderkegTickRate, stain::Stainable, viewer::DrawStained, PowderkegError, PowderkegPlugin, PowderkegSet};
+use rand::{distributions::{Distribution, Uniform}, rngs::SmallRng, thread_rng, Rng, SeedableRng};
 
 const CHUNK_SIZE: i32 = 64;
 
@@ -14,44 +14,84 @@ pub enum SimpleSand {
     Air,
 }
 
+pub struct SimpleSandDistribution {
+    pub sand_weight: f32,
+    pub stone_weight: f32,
+    pub air_weight: f32,
+}
+
+impl Distribution<SimpleSand> for SimpleSandDistribution {
+    fn sample<R: Rng + ?Sized>(&self, rng: &mut R) -> SimpleSand {
+        let total_weights = self.sand_weight + self.stone_weight + self.air_weight;
+
+        let mut t = Uniform::new(0.0, total_weights).sample(rng);
+
+        if t <= self.sand_weight {
+            return SimpleSand::Sand;
+        }
+
+        t -= self.sand_weight;
+
+        if t <= self.stone_weight {
+            return SimpleSand::Stone;
+        }
+
+        return SimpleSand::Air;
+    }
+}
+
+#[derive(Deref, DerefMut)]
+pub struct SimpleState(pub SmallRng);
+
+impl Default for SimpleState {
+    fn default() -> Self {
+        Self(SmallRng::from_entropy())
+    }
+}
+
 impl Cell for SimpleSand {
     type Error = Infallible;
+    type State = SimpleState;
 
-    fn tick(&self, origin: IVec2, grid: &impl Grid<Cell = Self>) -> Result<Option<Self::Action>, Self::Error> {
-        match self {
+    fn tick<G: Stainable<Cell = Self>>(input: TickInput<'_, Self, G>) -> Result<TickSuccess, PowderkegError<Self>> {
+        match input.this() {
             SimpleSand::Sand => {
-                let mut rng = thread_rng();
+                let mut rng = input.state().write_arc();
 
-                if matches!(grid.map(origin + IVec2::new(0, -1), |cell| matches!(cell, Self::Air)), Some(true)) {
+                if input.grid.map_cell(input.origin + IVec2::new(0, -1), |cell| matches!(cell, Self::Air))? {
+                    input.grid.stain_around(input.origin, 5);
                     if rng.gen_bool(0.1) {
-                        return Ok(Some(SimpleAction::Stable));
+                        return Ok(TickSuccess::Unstable)
                     } else {
-                        return Ok(Some(SimpleAction::Fall(Direction::Down)));
+                        input.grid.swap(input.origin, input.origin + IVec2::new(0, -1))?;
+                        return Ok(TickSuccess::Unstable);
                     }
                 }
 
                 let directions = if rng.gen_bool(0.5) {
                     &[
-                        (Direction::Left, IVec2::new(-1, -1)),
-                        (Direction::Right, IVec2::new(1, -1)),
+                        IVec2::new(-1, -1),
+                        IVec2::new(1, -1),
                     ]
                 } else {
                     &[
-                        (Direction::Right, IVec2::new(1, -1)),
-                        (Direction::Left, IVec2::new(-1, -1)),
+                        IVec2::new(1, -1),
+                        IVec2::new(-1, -1),
                     ]
                 };
 
-                for (direction, offset) in directions.iter() {
-                    if matches!(grid.map(origin + *offset, |cell| matches!(cell, Self::Air)), Some(true)) {
-                        return Ok(Some(SimpleAction::Fall(*direction)));
+                for offset in directions.iter() {
+                    if input.grid.map_cell(input.origin + *offset, |cell| matches!(cell, Self::Air))? {
+                        input.grid.swap(input.origin, input.origin + *offset)?;
+                        input.grid.stain_around(input.origin, 1);
+                        return Ok(TickSuccess::Unstable);
                     }
                 }
 
-                Ok(None)
+                Ok(TickSuccess::Stable)
             },
-            SimpleSand::Stone => Ok(None),
-            SimpleSand::Air => Ok(None),
+            SimpleSand::Stone => Ok(TickSuccess::Stable),
+            SimpleSand::Air => Ok(TickSuccess::Stable),
         }
     }
 
@@ -67,41 +107,6 @@ impl Renderable for SimpleSand {
             SimpleSand::Stone => Color::GRAY,
             SimpleSand::Air => Color::BLACK,
         }
-    }
-}
-
-#[derive(Clone, Copy)]
-pub enum Direction {
-    Down,
-    Left,
-    Right,
-}
-
-pub enum SimpleAction {
-    Stable,
-    Fall(Direction),
-}
-
-impl Action for SimpleAction {
-    type Cell = SimpleSand;
-    type State = ();
-
-    fn act(&self, origin: IVec2, grid: &mut impl Stainable<Cell = Self::Cell>) -> Option<()> {
-        match self {
-            SimpleAction::Fall(direction) => {
-                grid.stain_around(origin, 2);
-                match direction {
-                    Direction::Down => grid.swap(origin, origin + IVec2::new(0, -1))?,
-                    Direction::Left => grid.swap(origin, origin + IVec2::new(-1, -1))?,
-                    Direction::Right => grid.swap(origin, origin + IVec2::new(1, -1))?,
-                }
-            },
-            SimpleAction::Stable => {
-                grid.stain_around(origin, 1);
-            },
-        }
-
-        Some(())
     }
 }
 
@@ -130,9 +135,17 @@ fn main() {
 fn setup(
     mut commands: Commands,
 ) {
+    let mut rng = thread_rng();
+
+    let distribution = SimpleSandDistribution {
+        sand_weight: 1.0,
+        stone_weight: 0.0,
+        air_weight: 1.0,
+    };
+
     commands.spawn(Camera2dBundle::default());
 
-    commands.insert_resource(PowderkegTickRate(64.0));
+    commands.insert_resource(PowderkegTickRate(32.0));
 
     commands
         .spawn(SpatialBundle {
@@ -142,23 +155,14 @@ fn setup(
         .with_children(|children| {
             for cx in -3..=3 {
                 for cy in -3..=3 {
-                    let mut center_chunk = Chunk::default();
-
-                    let mut rng = thread_rng();
-        
-                    for x in 0..CHUNK_SIZE {
-                        for y in 0..CHUNK_SIZE {
-                            if rng.gen_bool(0.5) {
-                                center_chunk.replace(IVec2::new(x, y), SimpleSand::Sand);
-                            }
-                        }
-                    }
+                    let state = SimpleState(SmallRng::from_rng(&mut rng).unwrap());
+                    let chunk = Chunk::full_random(&mut rng, &distribution, state);
 
                     let chunk_coords = IVec2::new(cx, cy);
         
                     children.spawn((
                         ChunkBundle::<SimpleSand, CHUNK_SIZE> {
-                            chunk: center_chunk,
+                            chunk,
                             coords: ChunkCoords(chunk_coords),
                             transform: TransformBundle::from_transform(Transform::from_translation(chunk_coords.as_vec2().extend(0.0) * CHUNK_SIZE as f32)),
                             ..default()
@@ -213,7 +217,7 @@ fn paint_sand(
         if !Chunk::<SimpleSand, CHUNK_SIZE>::area().intersect(local_rect).is_empty() {
             for x in (local.x - 3)..=(local.x + 3) {
                 for y in (local.y - 3)..=(local.y + 3) {
-                    chunk.map_mut(IVec2::new(x, y), |old| *old = cell);
+                    chunk.map_cell_mut(IVec2::new(x, y), |old| *old = cell).ok();
                 }
             }
 

@@ -50,7 +50,7 @@ impl Cell for DynamicCell {
             DynamicCell::Gunpowder => {
                 for y in (origin.y - 1)..=(origin.y + 1) {
                     for x in (origin.x - 1)..=(origin.x + 1) {
-                        if matches!(grid.map(IVec2::new(x, y), Self::flammable), Some(true)) && rng.gen_bool(0.4) {
+                        if matches!(grid.map_cell(IVec2::new(x, y), Self::flammable), Some(true)) && rng.gen_bool(0.4) {
                             return Ok(Some(DynamicAction::Explode(2)));
                         }
                     }
@@ -59,7 +59,7 @@ impl Cell for DynamicCell {
                 let offsets = [IVec2::new(0, -1), IVec2::new(-1, -1), IVec2::new(1, -1)];
 
                 for offset in offsets {
-                    if !matches!(grid.map(origin + offset, Self::solid), Some(true)) {
+                    if !matches!(grid.map_cell(origin + offset, Self::solid), Some(true)) {
                         return Ok(Some(DynamicAction::Fall(offset)));
                     }
                 }
@@ -76,7 +76,7 @@ impl Cell for DynamicCell {
                 offsets.shuffle(&mut rng);
 
                 for offset in offsets {
-                    if !matches!(grid.map(origin + *offset, Self::solid), Some(true)) {
+                    if !matches!(grid.map_cell(origin + *offset, Self::solid), Some(true)) {
                         return Ok(Some(DynamicAction::Fall(*offset)));
                     }
                 }
@@ -93,7 +93,7 @@ impl Cell for DynamicCell {
                 offsets.shuffle(&mut rng);
 
                 for offset in offsets {
-                    if !matches!(grid.map(origin + *offset, Self::solid), Some(true)) {
+                    if !matches!(grid.map_cell(origin + *offset, Self::solid), Some(true)) {
                         return Ok(Some(DynamicAction::Fall(*offset)));
                     }
                 }
@@ -261,7 +261,7 @@ fn paint_sand(
         if !Chunk::<DynamicCell, CHUNK_SIZE>::area().intersect(local_rect).is_empty() {
             for x in (local.x - 3)..=(local.x + 3) {
                 for y in (local.y - 3)..=(local.y + 3) {
-                    chunk.map_mut(IVec2::new(x, y), |old| *old = cell);
+                    chunk.map_cell_mut(IVec2::new(x, y), |old| *old = cell);
                 }
             }
 

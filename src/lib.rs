@@ -4,6 +4,7 @@ pub mod stain;
 pub mod cell;
 pub mod simulation;
 pub mod viewer;
+pub mod area;
 
 use std::marker::PhantomData;
 

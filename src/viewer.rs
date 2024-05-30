@@ -3,7 +3,7 @@ use std::marker::PhantomData;
 use bevy::{asset::load_internal_asset, prelude::*, render::{render_asset::RenderAssetUsages, render_resource::AsBindGroup}, sprite::{Material2d, Material2dPlugin, Mesh2dHandle}};
 use image::{DynamicImage, RgbaImage};
 
-use crate::{cell::Renderable, chunk::Chunk, grid::Grid, stain::{Stain, Stainable}, PowderkegSet};
+use crate::{cell::Renderable, chunk::Chunk, grid::Grid, stain::Stainable, area::Area, PowderkegSet};
 
 #[rustfmt::skip]
 pub const CHUNK_SHADER_HANDLE: Handle<Shader> = Handle::weak_from_u128(33721791328259611974385727409331747184);
@@ -149,17 +149,17 @@ fn draw_stained<T, const N: i32>(
         let t = t.truncate();
 
         match chunk.stained() {
-            Stain::Empty => {},
-            Stain::Area(area) => {
+            Area::Empty => {},
+            Area::Area(area) => {
                 let min = (area.min.as_vec2() - Vec2::splat(N as f32 / 2.0)) * s + t;
-                let max = (area.max.as_vec2() - Vec2::splat(N as f32 / 2.0)) * s + t;
+                let max = ((area.max + IVec2::ONE).as_vec2() - Vec2::splat(N as f32 / 2.0)) * s + t;
 
                 gizmos.rect_2d((max + min) / 2.0, 0.0, max - min, Color::RED);
             },
-            Stain::Many(areas) => {
+            Area::Many(areas) => {
                 for area in areas.iter() {
                     let min = (area.min.as_vec2() - Vec2::splat(N as f32 / 2.0)) * s + t;
-                    let max = (area.max.as_vec2() - Vec2::splat(N as f32 / 2.0)) * s + t;
+                    let max = ((area.max + IVec2::ONE).as_vec2() - Vec2::splat(N as f32 / 2.0)) * s + t;
     
                     gizmos.rect_2d((max + min) / 2.0, 0.0, max - min, Color::RED);
                 }

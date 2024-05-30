@@ -4,7 +4,7 @@ use bevy::prelude::*;
 use parking_lot::RwLock;
 use rand::{distributions::Distribution, Rng};
 
-use crate::{cell::{Cell, Renderable}, grid::Grid, stain::{Stain, Stainable}, PowderkegError};
+use crate::{cell::{Cell, Renderable}, grid::Grid, stain::Stainable, area::Area, PowderkegError};
 
 #[derive(Component)]
 pub struct Chunk<T: Cell, const N: i32> {
@@ -75,7 +75,9 @@ where
     }
 
     pub fn index(&self, point: IVec2) -> Option<usize> {
-        if !Self::area().contains(point) {
+        let area = Self::area();
+
+        if !(area.min.x <= point.x && point.x <= area.max.x && area.min.y <= point.y && point.y <= area.max.y) {
             None
         } else {
             Some((N * point.y + point.x) as usize)
@@ -144,11 +146,15 @@ where
     }
     
     fn get_state(&self, point: IVec2) -> Result<Arc<RwLock<<T as Cell>::State>>, PowderkegError<Self::Cell>> {
-        if Self::area().contains(point) {
+        if self.covers().contains(point) {
             Ok(self.state.clone())
         } else {
             Err(PowderkegError::LocalOutOfBounds(point))
         }
+    }
+    
+    fn covers(&self) -> Area {
+        Self::area().into()
     }
 }
 
@@ -156,10 +162,10 @@ impl<T, const N: i32> Stainable for Chunk<T, N>
 where
     T: Cell,
 {
-    fn stained(&self) -> Stain {
+    fn stained(&self) -> Area {
         match self.stain {
             Some(area) => area.intersect(Self::area()).into(),
-            None => Stain::Empty,
+            None => Area::Empty,
         }
     }
 

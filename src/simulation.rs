@@ -3,8 +3,9 @@ use std::{marker::PhantomData, mem::swap, sync::Arc};
 use bevy::{prelude::*, utils::HashMap};
 use crossbeam_channel::unbounded;
 use parking_lot::RwLock;
+use rand::thread_rng;
 
-use crate::{cell::{Cell, Renderable, TickInput, TickSuccess}, chunk::{Chunk, ChunkCoords}, grid::Grid, stain::{Stain, Stainable}, PowderkegError, PowderkegSet};
+use crate::{cell::{Cell, Renderable, TickInput, TickSuccess}, chunk::{Chunk, ChunkCoords}, grid::Grid, stain::Stainable, area::Area, PowderkegError, PowderkegSet};
 
 pub(crate) struct PowderkegSimulationPlugin<T: Renderable + Send + Sync + 'static, const N: i32>(PhantomData<T>);
 
@@ -68,10 +69,13 @@ where
 
         if first_chunk == second_chunk {
             self.chunks.get_mut(&first_chunk).ok_or(PowderkegError::ChunkOutOfBounds(first_chunk))?.swap(first_local, second_local)
-        } else {        
+        } else {
             let [first_chunk, second_chunk] = self.chunks
                 .get_many_mut([&first_chunk, &second_chunk])
                 .ok_or_else(|| PowderkegError::SwapOutOfBounds { first: first_chunk, second: second_chunk })?;
+
+            first_chunk.stain_point(first_local);
+            second_chunk.stain_point(second_local);
 
             let first_cell = first_chunk.get_mut(first_local)?;
             let second_cell = second_chunk.get_mut(second_local)?;
@@ -90,6 +94,20 @@ where
             .ok_or(PowderkegError::ChunkOutOfBounds(chunk))?
             .get_state(local)
     }
+    
+    fn covers(&self) -> Area {
+        Area::from_areas(
+            self.chunks
+                .iter()
+                .map(|(coords, chunk)| {
+                    let mut area = chunk.covers();
+
+                    area.translate(*coords * N);
+
+                    area
+                })
+        )
+    }
 }
 
 
@@ -98,8 +116,8 @@ impl<'c, T, const N: i32> Stainable for WorldGrid<'c, T, N>
 where
     T: Renderable,
 {
-    fn stained(&self) -> Stain {
-        Stain::from_stains(self.chunks.values().map(|chunk| chunk.stained()))
+    fn stained(&self) -> Area {
+        Area::from_areas(self.chunks.values().map(|chunk| chunk.stained()))
     }
 
     fn stain(&mut self, area: IRect) {
@@ -160,7 +178,9 @@ fn simulate_powderkeg<T, const N: i32>(
 
             chunk.clear_stain();
 
-            stain.apply_randomly(|point| {
+            let mut rng = thread_rng();
+
+            stain.apply_randomly(&mut rng, |point| {
                 let range = {
                     let cell = chunk.at(point);
 
@@ -191,7 +211,7 @@ fn simulate_powderkeg<T, const N: i32>(
             if let Some(stain) = chunk.stain.as_ref() {
                 let area = Chunk::<T, N>::area();
 
-                if !(area.contains(stain.min) && area.contains(stain.max)) {
+                if !(rect_contains_inclusive(area, stain.min) && rect_contains_inclusive(area, stain.max)) {
                     send_stains.send(translate_rect(*stain, N * coords.0)).expect("channel unexpectedly closed");
                 }
             }
@@ -218,22 +238,30 @@ fn simulate_powderkeg<T, const N: i32>(
             world_grid.stain(stain);
         }
 
-        for point in recieve_to_tick.iter() {
-            // TODO: Add bounds checking for world
+        let world_covers = world_grid.covers();
 
-            let input = TickInput {
-                origin: point,
-                grid: &mut world_grid,
+        for point in recieve_to_tick.iter() {
+            let range = {
+                let cell = world_grid.at(point);
+
+                translate_rect(cell.range(), point)
             };
 
-            match T::tick(input) {
-                Ok(TickSuccess::Unstable) => {
-                    world_grid.stain_point(point);
-                },
-                Err(error) => {
-                    error!("Error ticking {point}: {error}");
-                },
-                _ => {},
+            if area_contains(range, &world_covers) {
+                let input = TickInput {
+                    origin: point,
+                    grid: &mut world_grid,
+                };
+    
+                match T::tick(input) {
+                    Ok(TickSuccess::Unstable) => {
+                        world_grid.stain_point(point);
+                    },
+                    Err(error) => {
+                        error!("Error ticking {point}: {error}");
+                    },
+                    _ => {},
+                }
             }
         }
 
@@ -243,4 +271,20 @@ fn simulate_powderkeg<T, const N: i32>(
 
 fn translate_rect(rect: IRect, offset: IVec2) -> IRect {
     IRect { min: rect.min + offset, max: rect.max + offset }
+}
+
+fn rect_contains_inclusive(rect: IRect, point: IVec2) -> bool {
+    rect.min.x <= point.x && point.x <= rect.max.x && rect.min.y <= point.y && point.y <= rect.max.y
+}
+
+fn area_contains(rect: IRect, area: &Area) -> bool {
+    for x in rect.min.x..=rect.max.x {
+        for y in rect.min.y..=rect.max.y {
+            if !area.contains(IVec2::new(x, y)) {
+                return false;
+            }
+        }
+    }
+
+    true
 }

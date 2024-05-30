@@ -66,7 +66,7 @@ impl Cell for MultiLiquidCell {
                 ];
 
                 for direction in directions {
-                    if matches!(grid.map(origin + *direction, |cell| {
+                    if matches!(grid.map_cell(origin + *direction, |cell| {
                         match cell.density() {
                             Some(other) => *density >= other,
                             None => true,

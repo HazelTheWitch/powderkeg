@@ -3,7 +3,7 @@ use std::{mem::replace, sync::Arc};
 use bevy::math::IVec2;
 use parking_lot::RwLock;
 
-use crate::{cell::Cell, PowderkegError};
+use crate::{area::Area, cell::Cell, PowderkegError};
 
 pub trait Grid {
     type Cell: Cell;
@@ -14,15 +14,17 @@ pub trait Grid {
 
     fn get_state(&self, point: IVec2) -> Result<Arc<RwLock<<Self::Cell as Cell>::State>>, PowderkegError<Self::Cell>>;
 
+    fn covers(&self) -> Area;
+
     fn replace(&mut self, point: IVec2, cell: Self::Cell) -> Result<Self::Cell, PowderkegError<Self::Cell>> {
         Ok(replace(self.get_mut(point)?, cell))
     }
 
-    fn map<T>(&self, point: IVec2, f: impl FnOnce(&Self::Cell) -> T) -> Result<T, PowderkegError<Self::Cell>> {
+    fn map_cell<T>(&self, point: IVec2, f: impl FnOnce(&Self::Cell) -> T) -> Result<T, PowderkegError<Self::Cell>> {
         self.get(point).map(f)
     }
 
-    fn map_mut<T>(&mut self, point: IVec2, f: impl FnOnce(&mut Self::Cell) -> T) -> Result<T, PowderkegError<Self::Cell>> {
+    fn map_cell_mut<T>(&mut self, point: IVec2, f: impl FnOnce(&mut Self::Cell) -> T) -> Result<T, PowderkegError<Self::Cell>> {
         self.get_mut(point).map(f)
     }
 
