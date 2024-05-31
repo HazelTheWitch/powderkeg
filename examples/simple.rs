@@ -59,7 +59,7 @@ impl Cell for SimpleSand {
                 let mut rng = input.state().write_arc();
 
                 if input.grid.map_cell(input.origin + IVec2::new(0, -1), |cell| matches!(cell, Self::Air))? {
-                    input.grid.stain_around(input.origin, 5);
+                    input.grid.stain_around(input.origin, 3);
                     if rng.gen_bool(0.1) {
                         return Ok(TickSuccess::Unstable)
                     } else {
@@ -145,7 +145,7 @@ fn setup(
 
     commands.spawn(Camera2dBundle::default());
 
-    commands.insert_resource(PowderkegTickRate(32.0));
+    commands.insert_resource(PowderkegTickRate(64.0));
 
     commands
         .spawn(SpatialBundle {
