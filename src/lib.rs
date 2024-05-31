@@ -48,13 +48,12 @@ where
         app
             .add_plugins(PowderkegViewPlugin::<T, N>::default())
             .add_plugins(PowderkegSimulationPlugin::<T, N>::default())
-            .configure_sets(Update, (PowderkegSet::Sync, PowderkegSet::Tick, PowderkegSet::Render).chain()); 
+            .configure_sets(Update, (PowderkegSet::Tick, PowderkegSet::Render).chain()); 
     }
 }
 
 #[derive(SystemSet, Debug, PartialEq, Eq, Clone, Copy, Hash)]
 pub enum PowderkegSet {
-    Sync,
     Tick,
     Render,
 }

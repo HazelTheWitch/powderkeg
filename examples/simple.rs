@@ -128,7 +128,7 @@ fn main() {
         .add_plugins(FrameTimeDiagnosticsPlugin)
         .add_systems(Startup, setup)
         .add_systems(Update, update_title)
-        .add_systems(Update, paint_sand.before(PowderkegSet::Sync))
+        .add_systems(Update, paint_sand.before(PowderkegSet::Tick))
         .run();
 }
 
